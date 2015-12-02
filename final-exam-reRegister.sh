@@ -37,7 +37,7 @@ login() {
 	# Check the login was in config
 	if [ -z "$login" ]; then
 		echo "Enter BUT login:"
-		read -s login
+		read login
 
 		if [ -z "$login" ]; then
 			echo "Cannot use empty login!"
