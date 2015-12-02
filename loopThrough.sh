@@ -7,45 +7,68 @@ printSyntax() {
 	echo -e "        - first argument specifies number of seconds to wait between"
 	echo -e "          the calls of second argument until at least one of these"
 	echo -e "          calls succeeds"
+	echo -e "          - it can be formatted as 'MIN-MAX' where MIN & MAX defines"
+	echo -e "            interval in which should be an random generated foreach"
+	echo -e "            script call"
 	echo
 	echo -e "        - second argument specifies bash script to call"
 	echo
 	echo -e "        - third argument specifies arguments to pass to that script"
 
+	exit 1
 }
 
 if [ -z "$1" ]; then
 	echo
 	echo "Please provide number of seconds to wait between program executions until success"
 	printSyntax
-	exit 1
 fi
 
 if [ -z "$2" ]; then
 	echo
 	echo "Please provide the name of script to run until success with provided interval of repetition"
 	printSyntax
-	exit 1
 fi
 
 if [ ! -f "$2" ]; then
 	echo
 	echo "File '$2' doesn't exists! Please provide a valid bash script!"
 	printSyntax
-	exit 1
 fi
 
 if [ -z "$3" ]; then
 	echo
 	echo "Please provide an argument for '$2' !"
 	printSyntax
-	exit 1
+fi
+
+# Sanate the interval
+isRange=$(echo "$1" | egrep "^[0-9]+-[0-9]+$")
+if [ "$isRange" ]; then
+	min=$(echo "$1" | awk -F- '{print $1}')
+	max=$(echo "$1" | awk -F- '{print $2}')
+
+	if [ ! $max ] || [ ! $min ]; then
+		echo "Range given is wrongly formatted"
+		printSyntax
+	fi
+elif ! [[ "$1" =~ '^[0-9]+$' ]]; then # Checks it really is a number ..
+	echo "Please provide interval in seconds !"
+	printSyntax
 fi
 
 /bin/bash "$2" "$3"
 while [ ! $? -eq 0 ]; do
 
-	sleep $1
+	if [ "$isRange" ]; then
+		interval=$(( $min + $RANDOM % $(( $max - $min )) ))
+
+		echo "Choosing interval $interval secs"
+
+		sleep $interval
+	else
+		sleep $1
+	fi
 	/bin/bash "$2" "$3"
 
 done
