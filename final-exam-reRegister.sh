@@ -103,5 +103,5 @@ else
 	fi
 fi
 
-
+echo "Ukončuji tento skript neboť dospěl do nedefinovaného bodu. Vracím 0 !!"
 exit 0

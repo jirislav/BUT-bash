@@ -43,7 +43,7 @@ if [ -z "$3" ]; then
 fi
 
 /bin/bash "$2" "$3"
-while [ $? -eq 1 ]; do
+while [ ! $? -eq 0 ]; do
 
 	sleep $1
 	/bin/bash "$2" "$3"
