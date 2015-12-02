@@ -32,8 +32,8 @@ login() {
 
 		# no .. we don't :)
 		URL="https://www.vutbr.cz/login/"
-		curl -Lc "$cookieA" "$URL" > "$html"
-		hiddenData=$(hxnormalize -edxL "$html" | hxselect -s '\n' "input[type=hidden]" | egrep -v "name=\"type|name=\"hact" |  awk 'BEGIN{ORS="&"; FS="\""}{print $2"="$6}')
+		curl -sLc "$cookieA" "$URL" > "$html"
+		local hiddenData=$(hxnormalize -edxL "$html" | hxselect -s '\n' "input[type=hidden]" | egrep -v "name=\"type|name=\"hact" |  awk 'BEGIN{ORS="&"; FS="\""}{print $2"="$6}')
 
 		# ouch! probably bad login URL?
 		if [ -z "$(echo "$hiddenData" | grep fdkey)" ]; then
@@ -67,14 +67,7 @@ login() {
 	data="${hiddenData}LDAPlogin=$login&LDAPpasswd=$pw"
 	URL="https://www.vutbr.cz/login/in"
 
-	justDoPOST
-}
-
-justDoPOST() {
-	tmpHtml="$html"
-	html="/dev/null"
 	parseURLWithDataPOST
-	html="$tmpHtml"
 }
 
 assertURLnotEmpty() {
@@ -102,17 +95,41 @@ htmlHasLoginForm() {
 	fi
 }
 
+printVutMsg() {
+	# TODO: Implement sending an email about any messages ;)
+
+	local toRet=0
+
+	messageOk=$(hxnormalize -edxL "$html" | hxselect -s "\n" -c ".vutMsg.ok li" | sed 's_<.*>__g')
+	messageErr=$(hxnormalize -edxL "$html" | hxselect -s "\n" -c ".vutMsg.error li" | sed 's_<.*>__g')
+
+	if [ "$messageErr" ]; then
+		echo
+		echo "$messageErr"
+		echo
+		local toRet=1
+	fi
+
+	if [ "$messageOk" ];then
+		echo
+		echo "$messageOk"
+		echo
+	fi
+
+	return $toRet
+}
+
 parseURLWithDataPOST() {
 
 	assertDataNotEmpty
 	assertURLnotEmpty
 
 	switchCookies
-	curl -Lc "$cookieA" -b "$cookieB" -d "$data" "$URL" > "$html"
+	curl -sLc "$cookieA" -b "$cookieB" -d "$data" "$URL" > "$html"
 
 	# If returned login form, that means we have to login ..
 	htmlHasLoginForm
-	if [ $? -eq 0 ] && [ $html != '/dev/null' ]; then
+	if [ $? -eq 0 ] ; then
 		local tmpDATA="$data"
 		local tmpURL="$URL"
 
@@ -122,6 +139,10 @@ parseURLWithDataPOST() {
 		URL="$tmpURL"
 
 		parseURLWithDataPOST
+		return $?
+	else
+		printVutMsg
+		return $?
 	fi
 }
 
@@ -130,11 +151,11 @@ parseURL() {
 	assertURLnotEmpty
 
 	switchCookies
-	curl -Lc "$cookieA" -b "$cookieB" "$URL" > "$html"
+	curl -sLc "$cookieA" -b "$cookieB" "$URL" > "$html"
 
 	# If returned login form, that means we have to login ..
 	htmlHasLoginForm
-	if [ $? -eq 0 ] && [ $html != '/dev/null' ]; then
+	if [ $? -eq 0 ] ; then
 		local tmpDATA="$data"
 		local tmpURL="$URL"
 
@@ -144,6 +165,10 @@ parseURL() {
 		URL="$tmpURL"
 
 		parseURL
+		return $?
+	else
+		printVutMsg
+		return $?
 	fi
 
 }
