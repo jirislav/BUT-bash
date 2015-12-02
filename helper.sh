@@ -100,19 +100,19 @@ printVutMsg() {
 
 	local toRet=0
 
-	messageOk=$(hxnormalize -edxL "$html" | hxselect -s "\n" -c ".vutMsg.ok li" | sed 's_<.*>__g')
-	messageErr=$(hxnormalize -edxL "$html" | hxselect -s "\n" -c ".vutMsg.error li" | sed 's_<.*>__g')
+	messageOk=$(hxnormalize -edxL "$html" | hxselect -cs "\n" ".vutMsg.ok li" | sed 's_<.*>__g')
+	messageErr=$(hxnormalize -edxL "$html" | hxselect -cs "\n" ".vutMsg.error li" | sed 's_<.*>__g')
 
 	if [ "$messageErr" ]; then
 		echo
-		echo "$messageErr"
+		echo $messageErr
 		echo
 		local toRet=1
 	fi
 
 	if [ "$messageOk" ];then
 		echo
-		echo "$messageOk"
+		echo $messageOk
 		echo
 	fi
 

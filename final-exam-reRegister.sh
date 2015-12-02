@@ -9,24 +9,18 @@ if [ -z "$1" ]; then
 fi
 
 # Set first argument to the apid of the subject to reRegister into
-URL="https://www.vutbr.cz/studis/student.phtml?sn=terminy_zk&apid=$1"
-APID_URL="$URL"
-parseURL
+APID_URL="https://www.vutbr.cz/studis/student.phtml?sn=terminy_zk&apid=$1"
+
+parseApidURL() {
+	URL="$APID_URL"
+	parseURL
+	parseExamPart
+}
 
 parseExamPart() {
 	examPart=$(cat "$html" | grep -B1 -A1000 zkouška | grep -B1000 -m 2 m_ppzc | hxnormalize -edxL)
+	examLogoutLink=$(echo "$examPart" | hxselect -s "\n" "div.m_podnadpis" | grep "odhlásit" | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
 }
-
-parseExamPart
-
-SUBJECT=$(echo $examPart | hxselect -cs "\n" "div.m_nadpis span.hlavni")
-
-if [ ! "$examPart" ]; then
-	echo "No exams published yet .."
-	exit 2001
-fi
-
-examLogoutLink=$(echo "$examPart" | hxselect -s "\n" "div.m_podnadpis" | grep "odhlásit" | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
 
 registerFirstExamWithFreeSlots() {
 	local regLink=$(echo "$examPart" | hxselect -cs "\n" "div.m_podnadpis" | grep "přihlásit" | head -n 1 | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
@@ -50,6 +44,16 @@ registerFirstExamWithFreeSlots() {
 		return 1
 	fi
 }
+
+parseApidURL
+
+SUBJECT=$(echo $examPart | hxselect -cs "\n" "div.m_nadpis span.hlavni")
+
+if [ ! "$examPart" ]; then
+	echo "No exams published yet .."
+	exit 2001
+fi
+
 
 # Now we have three possibilities:
 # Not logged in anywhere -> log into the first exam available ..
@@ -85,7 +89,7 @@ else
 				URL="https://www.vutbr.cz/studis/$examLogoutLink"
 				parseURL
 
-				parseExamPart
+				parseApidURL
 
 				registerFirstExamWithFreeSlots
 				exit $?
