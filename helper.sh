@@ -25,13 +25,21 @@ switchCookies() {
 login() {
 
 	# Get the required generated hidden intputs
-	URL="https://www.vutbr.cz/login/"
-	curl -Lc "$cookieA" "$URL" > "$html"
 	hiddenData=$(hxnormalize -edxL "$html" | hxselect -s '\n' "input[type=hidden]" | egrep -v "name=\"type|name=\"hact" |  awk 'BEGIN{ORS="&"; FS="\""}{print $2"="$6}')
 
+	# Check if we have not already the html containing the hidden inputs
 	if [ -z "$(echo "$hiddenData" | grep fdkey)" ]; then
-		echo "Empty FDKEY!"
-		exit 1003
+
+		# no .. we don't :)
+		URL="https://www.vutbr.cz/login/"
+		curl -Lc "$cookieA" "$URL" > "$html"
+		hiddenData=$(hxnormalize -edxL "$html" | hxselect -s '\n' "input[type=hidden]" | egrep -v "name=\"type|name=\"hact" |  awk 'BEGIN{ORS="&"; FS="\""}{print $2"="$6}')
+
+		# ouch! probably bad login URL?
+		if [ -z "$(echo "$hiddenData" | grep fdkey)" ]; then
+			echo "Empty FDKEY!"
+			exit 1003
+		fi
 	fi
 
 	# Check the login was in config
@@ -65,7 +73,7 @@ login() {
 justDoPOST() {
 	tmpHtml="$html"
 	html="/dev/null"
-	getHtmlWithDataPOST
+	parseURLWithDataPOST
 	html="$tmpHtml"
 }
 
@@ -85,19 +93,57 @@ assertDataNotEmpty() {
 	fi
 }
 
-getHtmlWithDataPOST() {
+htmlHasLoginForm() {
+
+	if [ ! -z "$(hxnormalize -edxL "$html" | hxselect -s "\n" "form#login_form")" ]; then
+		return 0 # True :D
+	else
+		return 1 # False :D
+	fi
+}
+
+parseURLWithDataPOST() {
 
 	assertDataNotEmpty
 	assertURLnotEmpty
 
 	switchCookies
 	curl -Lc "$cookieA" -b "$cookieB" -d "$data" "$URL" > "$html"
+
+	# If returned login form, that means we have to login ..
+	htmlHasLoginForm
+	if [ $? -eq 0 ] && [ $html != '/dev/null' ]; then
+		local tmpDATA="$data"
+		local tmpURL="$URL"
+
+		login
+
+		data="$tmpDATA"
+		URL="$tmpURL"
+
+		parseURLWithDataPOST
+	fi
 }
 
-getHtml() {
+parseURL() {
 
 	assertURLnotEmpty
 
 	switchCookies
 	curl -Lc "$cookieA" -b "$cookieB" "$URL" > "$html"
+
+	# If returned login form, that means we have to login ..
+	htmlHasLoginForm
+	if [ $? -eq 0 ] && [ $html != '/dev/null' ]; then
+		local tmpDATA="$data"
+		local tmpURL="$URL"
+
+		login
+
+		data="$tmpDATA"
+		URL="$tmpURL"
+
+		parseURL
+	fi
+
 }
