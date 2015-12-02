@@ -2,7 +2,15 @@
 
 DIR="$(dirname $0)"
 
-config="$DIR/config"
+configFileName="$DIR/config"
+
+# Load the config
+if [ -f "$configFileName" ]; then
+	source "$configFileName"
+else
+	echo "Config not found at '$configFileName'!"
+	exit 6
+fi
 
 cookieA="$DIR/.cookieA"
 cookieB="$DIR/.cookieB"
@@ -26,11 +34,7 @@ login() {
 		exit 1
 	fi
 
-	# Load the login id
-	if [ -f "config" ]; then
-		source "$config"
-	fi
-
+	# Check the login was in config
 	if [ -z "$login" ]; then
 		echo "Enter BUT login:"
 		read -s login
@@ -55,7 +59,7 @@ login() {
 	data="${hiddenData}LDAPlogin=$login&LDAPpasswd=$pw"
 	URL="https://www.vutbr.cz/login/in"
 
-	getHtmlWithDataPOST
+	justDoPOST
 }
 
 justDoPOST() {
@@ -102,7 +106,7 @@ login
 
 if [ -z "$1" ]; then
 	echo "No apid provided !"
-	exit 3
+	exit 5
 fi
 
 # Set first argument to the apid of the subject to reRegister into
