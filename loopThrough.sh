@@ -1,5 +1,8 @@
 #!/bin/bash
 
+logs=logs
+logfile="$logs-${2/*\//}-$3"
+mailto="mail@jkozlovsky.cz"
 printSyntax() {
 	echo
 	echo -e "Syntax: ./loopThrough.sh 5 final-exam-reRegister.sh \"160569\""
@@ -57,8 +60,11 @@ elif ! [[ "$1" =~ '^[0-9]+$' ]]; then # Checks it really is a number ..
 	printSyntax
 fi
 
-/bin/bash "$2" "$3"
-while [ ! $? -eq 0 ]; do
+echo >> "$logfile"
+date >> "$logfile"
+/bin/bash "$2" "$3" | tee -a "$logfile"
+
+while [ ! ${PIPESTATUS[0]} -eq 0 ]; do
 
 	if [ "$isRange" ]; then
 		interval=$(( $min + $RANDOM % $(( $max - $min )) ))
@@ -69,10 +75,14 @@ while [ ! $? -eq 0 ]; do
 	else
 		sleep $1
 	fi
-	/bin/bash "$2" "$3"
+
+	echo >> "$logfile"
+	date >> "$logfile"
+	/bin/bash "$2" "$3" | tee -a "$logfile"
 
 done
 
 echo
 echo "Finally, the program '$2' succeded !! :)"
+mailx -s "The job in BUT-bash is done! (${logfile/$logs-/})" < /dev/null "$mailto"
 
