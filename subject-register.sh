@@ -10,41 +10,6 @@ fi
 
 APID="$1"
 
-parseApidURL() {
-	URL="$APID_URL"
-	parseURL
-	parseExamPart
-}
-
-parseExamPart() {
-	examPart=$(cat "$html" | grep -B1 -A1000 zkouška | grep -B1000 -m 2 m_ppzc | hxnormalize -edxL)
-	examLogoutLink=$(echo "$examPart" | hxselect -s "\n" "div.m_podnadpis" | grep "odhlásit" | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
-}
-
-registerFirstExamWithFreeSlots() {
-	local regLink=$(echo "$examPart" | hxselect -cs "\n" "div.m_podnadpis" | grep "přihlásit" | head -n 1 | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
-
-	if [ "$regLink" ]; then
-		URL="https://www.vutbr.cz/studis/$regLink"
-
-		echo "Našel jsem volné místo, registruji se ..."
-
-		parseURL
-		if [ $? -eq 0 ]; then
-			echo "Registrace proběhla úspěšně :)"
-			return 0
-		else
-			echo "Něco je špatně :/"
-			return 1
-		fi
-
-	else
-		echo -e "Nemohu se přihlásit na žádnou zkoušku z předmětu '$SUBJECT'\n podívejte se prosím 'ručně' na tuto URL: $APID_URL"
-		return 1
-	fi
-}
-
-#171639
 URL="https://www.vutbr.cz/studis/student.phtml?sn=individualni_plan_fekt"
 parseURL
 
@@ -63,5 +28,3 @@ if [ $? -eq 0 ] ; then
 else
 	exit 1
 fi
-
-#hxnormalize -edxL "$html" | hxselect -s '\n' "input[checked]" | egrep -v "disabled|radio" | awk 'BEGIN{ORS="&"; FS="name=\"|\""}{print $8"=on"}'
