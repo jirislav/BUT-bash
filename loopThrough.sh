@@ -55,9 +55,9 @@ if [ "$isRange" ]; then
 		echo "Range given is wrongly formatted"
 		printSyntax
 	fi
-elif ! [[ "$1" =~ '^[0-9]+$' ]]; then # Checks it really is a number ..
-	echo "Please provide interval in seconds !"
-	printSyntax
+#elif ! [[ "$1" =~ '^[0-9]+$' ]]; then # Checks it really is a number ..
+#	echo "Please provide interval in seconds !"
+#	printSyntax
 fi
 
 echo >> "$logfile"
@@ -84,5 +84,8 @@ done
 
 echo
 echo "Finally, the program '$2' succeded !! :)"
-mailx -s "The job in BUT-bash is done! (${logfile/$logs-/})" < /dev/null "$mailto"
+
+export SUBJECT="The job in BUT-bash is done!"
+export TEXT_MESSAGE="Looks like job '${logfile/$logs-/}' was successfully completed!\n Seeya!"
+envsubst < .mail.template.txt | sendmail $mailto
 

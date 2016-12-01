@@ -15,10 +15,21 @@ parseApidURL() {
 	URL="$APID_URL"
 	parseURL
 	parseExamPart
+	# echo "$examPart"
 }
 
 parseExamPart() {
-	examPart=$(cat "$html" | grep -B1 -A1000 zkouška | grep -B1000 -m 2 m_ppzc | hxnormalize -edxL)
+	# We have to filter out the divs with "zkoušk" in it because of possible different types of exams than final exam
+	# parent div defined as "m_ppzc" used to be one line above the match of "zkoušk", but we don't know where it ends,
+	# so exclude all another m_ppzc ..
+	possible_exam_parts=$(cat "$html" | hxnormalize -edxL | hxselect -s "\n" "div.page div.m_ppzc" | grep -B6 -A1000 zkoušk )
+	if [ "`echo "$possible_exam_parts" | grep m_ppzc | wc -l`" -gt 1 ]; then
+		# More than 1 type of registrations so cut it to the first one .. TODO resolve this possible bug of wanting to register to all the exams :)
+		examPart=$(echo "$possible_exam_parts" | grep -B1000 -m 2 m_ppzc | hxnormalize -edxL )
+	else
+		examPart="$possible_exam_parts"
+	fi
+		
 	examLogoutLink=$(echo "$examPart" | hxselect -s "\n" "div.m_podnadpis" | grep "odhlásit" | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
 }
 
@@ -48,7 +59,6 @@ registerFirstExamWithFreeSlots() {
 parseApidURL
 
 SUBJECT=$(echo $examPart | hxselect -cs "\n" "div.m_nadpis span.hlavni")
-
 if [ ! "$examPart" ]; then
 	echo "No exams published yet .."
 	exit 2001
