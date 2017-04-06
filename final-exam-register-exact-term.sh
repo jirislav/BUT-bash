@@ -3,6 +3,14 @@
 helperFileName="$(dirname $0)/helper.sh"
 source $helperFileName
 
+if test -z "$APID"; then
+	APID="$1"
+fi
+
+if test -z "$TID"; then
+	TID="$2"
+fi
+
 ERRORS=()
 if [ -z "$APID" ]; then
 	ERRORS+=("No apid provided !")
@@ -34,7 +42,7 @@ parseExamPart() {
 	# parent div defined as "m_ppzc" used to be one line above the match of "zkoušk", but we don't know where it ends,
 	# so exclude all another m_ppzc ..
 
-	possible_exam_parts=$(cat "$html" | hxnormalize -edxL | hxselect -s "\n" "div.page div.m_ppzc" | grep -B6 -A1000 zkoušk )
+	possible_exam_parts=$(cat "$html" | hxnormalize -edxL | hxselect -s "\n" "div.page div.m_ppzc" | grep -B6 -A1000 zkoušk | hxnormalize -edxL )
 
 	# Ignore this (was neccessary only for registering the first exam)
 	# 
@@ -47,26 +55,26 @@ parseExamPart() {
 	
 	examPart="$possible_exam_parts"
 		
-	examLogoutLink=$(echo "$examPart" | hxselect -s "\n" "div.m_podnadpis" | grep "odhlásit" | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
+	examLogoutLink=$(echo "$examPart" | hxselect -s "\n" "div.m_podnadpis" | grep "odhlásit" | egrep "tid=($TID)" | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
 
-	TID_EXISTS=`echo "$examPart" | grep -o "$TID"`
+	TID_EXISTS=`echo "$examPart" | egrep -o "$TID"`
 
 	if test -z "$TID_EXISTS"; then
-		echo "TID=$TID not found for APID=$APID !" >&2
+		echo "TID=($TID) not found for APID=$APID !" >&2
 		echo "Please check '$APID_URL' and gimme the right TID" >&2
 		exit 2
 	fi
 
-	TID_ALREADY_REGISTERED=`echo "$examLogoutLink" | grep -o "tid=$TID"`
+	TID_ALREADY_REGISTERED=`echo "$examLogoutLink" | egrep -o "tid=($TID)"`
 
 	if test "$TID_ALREADY_REGISTERED"; then
-		echo "That exam is already registered :)"
+		echo "That exam TID=($TID) is already registered :), see '$APID_URL'"
 		exit 0
 	fi
 }
 
 registerExamWithTID() {
-	local regLink=$(echo "$examPart" | hxselect -cs "\n" "div.m_podnadpis" | grep "přihlásit" | grep "tid=$TID" | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
+	local regLink=$(echo "$examPart" | hxselect -cs "\n" "div.m_podnadpis" | grep "přihlásit" | egrep "tid=($TID)" | head -n1 | awk 'BEGIN{FS="\""}{print $2}' | hxunent )
 
 	if [ "$regLink" ]; then
 		URL="https://www.vutbr.cz/studis/$regLink"
@@ -90,58 +98,63 @@ registerExamWithTID() {
 
 parseApidURL
 
-SUBJECT=$(echo $examPart | hxselect -cs "\n" "div.m_nadpis span.hlavni")
+SUBJECT=$(echo "$examPart" | hxselect -cs "\n" "div.m_nadpis span.hlavni" | head -n1 )
 if [ ! "$examPart" ]; then
 	echo "No exams published yet .."
 	exit 2001
 fi
 
 
-# Now we have three possibilities:
-# Not logged in anywhere -> log into the first exam available ..
-# Logged in somewhere -> determine if there are any free slots in preceding exams
+examsInfos=$(echo $examPart | hxselect -s "\n" "div.m_tinfo" | egrep "$TID")
 
-if [ ! "$examLogoutLink" ]; then
-	# 1st scenario
-	registerExamWithTID
-	exit $?
-else
-	# 2nd scenario ..
-
-	examsInfos=$(echo $examPart | hxselect -s "\n" "div.m_tinfo")
-	examsCount=$(echo "$examsInfos" | wc -l)
-
-	# Iterate over the exam infos .. :)
-	for (( i=1; i < $examsCount; ++i )); do
-
-		currLine=$(echo "$examsInfos" | sed -n ${i}p)
-
-		isGoodTID=`echo $currLine | grep -o "$TID"`
-
-		if test -z "$isGoodTID"; then
-			continue;
-		fi
-
-		isWithoutSlots=$(echo $currLine | grep m_nespl_pod)
-
-		if [ ! "$isWithoutSlots" ]; then
-			# We have found better exam slot !! :D
-			# Logout from the current registered slot & register this one !
-			URL="https://www.vutbr.cz/studis/$examLogoutLink"
-			parseURL
-
-			parseApidURL
-
-			registerExamWithTID
-			exit $?
-
-		else
-			echo "Na zvoleném termínu ze zkoušky z '$SUBJECT' stále není volné místo :/"
-			exit 1
-		fi
-
-	done
+if test -z "$examsInfos"; then
+	echo "Nenašel jsem kombinaci APID=$APID && TID=($TID) ! Zkontrolujte prosím '$APID_URL'" >&2
+	exit 2
 fi
 
-echo "Ukončuji tento skript neboť dospěl do nedefinovaného bodu. Vracím 0 !!"
-exit 0
+examsCount=$(echo "$examsInfos" | wc -l)
+
+echo "Found $examsCount exams totally"
+# Iterate over the exam infos .. :)
+for (( i=1; i <= $examsCount; ++i )); do
+
+	echo processing $i
+	currLine=$(echo "$examsInfos" | sed -n ${i}p)
+
+	CURRENT_TID=`echo $currLine | egrep -o "tid=($TID)"`
+
+	if test -z "$CURRENT_TID"; then
+		continue;
+	fi
+
+	isWithoutSlots=$(echo $currLine | grep m_nespl_pod)
+
+	if [ ! "$isWithoutSlots" ]; then
+
+		# We cannot logout from found slot, because it could be from another exams group !!
+
+		#if test "$examLogoutLink"; then
+		#	# We have found better exam slot !! :D
+		#	# Logout from the current registered slot & register this one !
+		#	URL="https://www.vutbr.cz/studis/$examLogoutLink"
+		#	parseURL
+
+		#	parseApidURL
+		#fi
+
+		registerExamWithTID
+		if test $? -eq 0; then
+			exit 0
+		else
+			echo "Buď byl někdo rychlejší, nebo se něco stalo špatně .. předpokládal jsem, že na tomto termíu je volno ($CURRENT_TID), ale registrace se nepovedla? wtf??"
+		fi
+
+
+	else
+		echo "Na termínu ($CURRENT_TID) zkoušky z '$SUBJECT' stále není volné místo :/"
+	fi
+
+done
+
+echo "Na žádném z termínů není volno :/"
+exit 1

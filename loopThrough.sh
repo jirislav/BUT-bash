@@ -45,24 +45,29 @@ if [ -z "$3" ]; then
 	printSyntax
 fi
 
+SLEEP_TIME=$1
+shift
+
 # Sanate the interval
-isRange=$(echo "$1" | egrep "^[0-9]+-[0-9]+$")
+isRange=$(echo "$SLEEP_TIME" | egrep "^[0-9]+-[0-9]+$")
 if [ "$isRange" ]; then
-	min=$(echo "$1" | awk -F- '{print $1}')
-	max=$(echo "$1" | awk -F- '{print $2}')
+	min=$(echo "$SLEEP_TIME" | awk -F- '{print $1}')
+	max=$(echo "$SLEEP_TIME" | awk -F- '{print $2}')
 
 	if [ ! $max ] || [ ! $min ]; then
 		echo "Range given is wrongly formatted"
 		printSyntax
 	fi
-#elif ! [[ "$1" =~ '^[0-9]+$' ]]; then # Checks it really is a number ..
+#elif ! [[ "$SLEEP_TIME" =~ '^[0-9]+$' ]]; then # Checks it really is a number ..
 #	echo "Please provide interval in seconds !"
 #	printSyntax
 fi
 
 echo >> "$logfile"
 date >> "$logfile"
-/bin/bash "$2" "$3" | tee -a "$logfile"
+
+echo "/bin/bash $@ | tee -a '$logfile'"
+/bin/bash "$@" | tee -a "$logfile"
 
 while [ ! ${PIPESTATUS[0]} -eq 0 ]; do
 
@@ -73,12 +78,15 @@ while [ ! ${PIPESTATUS[0]} -eq 0 ]; do
 
 		sleep $interval
 	else
-		sleep $1
+		sleep $SLEEP_TIME
 	fi
 
 	echo >> "$logfile"
 	date >> "$logfile"
-	/bin/bash "$2" "$3" | tee -a "$logfile"
+
+	shift
+	echo "/bin/bash $@ | tee -a '$logfile'"
+	/bin/bash "$@" | tee -a "$logfile"
 
 done
 
