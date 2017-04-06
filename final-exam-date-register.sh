@@ -4,12 +4,19 @@ helperFileName="$(dirname $0)/helper.sh"
 source $helperFileName
 
 if [ -z "$1" ]; then
-	echo "No apid provided !"
-	exit 2000
+	echo "No apid provided !" >&2
+	exit 255
 fi
 
-# Set first argument to the apid of the subject to reRegister into
+if [ -z "$2" ]; then
+	echo "No whole bold date specified !" >&2
+	exit 254
+fi
+
+# Set first argument to the apid of the subject to register into
 APID_URL="https://www.vutbr.cz/studis/student.phtml?sn=terminy_zk&apid=$1"
+
+SEARCH=`echo "$2" | sed 's,\([0-9]:[0-9][0-9]\) -,\1</span> -,g' | sed 's, ,\\s*,g'`
 
 parseApidURL() {
 	URL="$APID_URL"
@@ -23,6 +30,7 @@ parseExamPart() {
 	# parent div defined as "m_ppzc" used to be one line above the match of "zkoušk", but we don't know where it ends,
 	# so exclude all another m_ppzc ..
 	possible_exam_parts=$(cat "$html" | hxnormalize -edxL | hxselect -s "\n" "div.page div.m_ppzc" | grep -B6 -A1000 zkoušk )
+
 	if [ "`echo "$possible_exam_parts" | grep m_ppzc | wc -l`" -gt 1 ]; then
 		# More than 1 type of registrations so cut it to the first one .. TODO resolve this possible bug of wanting to register to all the exams :)
 		echo "WARNING: This script will register you only on the first group of final exams !"
@@ -30,7 +38,7 @@ parseExamPart() {
 	else
 		examPart="$possible_exam_parts"
 	fi
-		
+	
 	examLogoutLink=$(echo "$examPart" | hxselect -s "\n" "div.m_podnadpis" | grep "odhlásit" | awk 'BEGIN{FS="\""}{print $2}' | hxunent)
 }
 
